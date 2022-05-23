@@ -1,6 +1,6 @@
 # andybot
 
-Source code for the @andyinnie-test#5431 Discord bot. For use in my personal servers.
+Source code for the @andyinnie-test#5431 Discord bot using discord.py. For personal use in my own servers.
 
 Design is highly modular, with on-the-fly module reloading for seamless development.
 
