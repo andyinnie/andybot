@@ -164,6 +164,9 @@ def load(core):
             await message.channel.send(embed=util.iferror('Command not found'))
             return
 
+        while '' in args:
+            args.remove('')
+
         command = commands_dict[name]
         if command.check_message(message):
             await command.function(message, args)
