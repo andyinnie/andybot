@@ -52,8 +52,7 @@ def load(core):
                     client = user_spotifies[message.author.id]['client']
 
                     try:
-                        await function(message, args, client)
-                        return
+                        return await function(message, args, client)
                     except spotipy.exceptions.SpotifyException as e:
                         if e.http_status == 403:
                             # invalid scope, send a new auth link with correct scope
@@ -72,12 +71,17 @@ def load(core):
                                       f'&redirect_uri={REDIRECT_URI}'
                                       f'&state={state}'
                                       f'&scope={scope}')  # kek
-            await message.channel.send(embed=util.ifinfo(
-                (f'{reason}\n' if reason else '') +
-                'I\'ve DMed you a link - click on it to authorize Spotify.\n'
-                'When you\'re done, repeat the command.'
-            ))
+            # await message.channel.send(embed=util.ifinfo(
+            #     (f'{reason}\n' if reason else '') +
+            #     'I\'ve DMed you a link - click on it to authorize Spotify.\n'
+            #     'When you\'re done, repeat the command.'
+            # ))
             waiting_on_auth.add(state)
+            return {
+                "embed": util.ifinfo((f'{reason}\n' if reason else '') +
+                                     'I\'ve DMed you a link - click on it to authorize Spotify.\n'
+                                     'When you\'re done, repeat the command.')
+            }
         return _internal
 
     def catch_timeout(function):
