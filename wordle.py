@@ -33,7 +33,7 @@ async def run_analysis(user_id):
     scores = []
     sum = 0
     count = 0
-    async for m in channel.history():
+    async for m in channel.history(limit=None):
         if m.author.id != user_id:
             continue
 
