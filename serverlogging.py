@@ -35,11 +35,11 @@ def load(core):
             icon_url=author.avatar_url
         ).add_field(
             name='Before',
-            value=util.shorten(before.content, 1024),
+            value=util.shorten(before.content, 1024) if before.content else "*empty message*",
             inline=False
         ).add_field(
             name='After',
-            value=util.shorten(after.content, 1024),
+            value=util.shorten(after.content, 1024) if after.content else "*empty message*",
             inline=False
         )
 
@@ -53,7 +53,9 @@ def load(core):
         channel = core.bot.get_channel(payload.channel_id)
         new_message = await channel.fetch_message(payload.message_id)
         core.bot.dispatch('message_edit',
-                          util.FakeMessage(content='*Message not cached*'),
+                          util.FakeMessage(content='*Message not cached*',
+                                           author=new_message.author,
+                                           channel=new_message.channel),
                           new_message)
 
     # ============================== #
@@ -74,7 +76,7 @@ def load(core):
 
         embed = discord.Embed(
             title=f'Message deleted in #{message.channel.name}',
-            description=util.shorten(message.content, 1024),
+            description=util.shorten(message.content, 1024) if message.content else "*empty message*",
             color=util.Color.red,
             timestamp=util.now_dt()
         ).set_author(
