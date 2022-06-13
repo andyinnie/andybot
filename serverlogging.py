@@ -47,6 +47,8 @@ def load(core):
 
     @core.bot.event
     async def on_raw_message_edit(payload):
+        # cached messages cause both edit events to be fired.
+        # so, catch cached messages here
         if payload.cached_message:
             return
 
@@ -98,6 +100,8 @@ def load(core):
 
     @core.bot.event
     async def on_raw_message_delete(payload):
+        # cached messages cause both delete events to be fired.
+        # so, catch cached messages here
         if payload.cached_message:
             return
 
