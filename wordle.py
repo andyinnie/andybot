@@ -66,7 +66,7 @@ def load(_):
     wordle_responder.id = RESPONDER_ID
 
     if register_responder():
-        register_responder()(wordle_responder)
+        register_responder()(wordle_responder, priority=True)
         print('registered wordle responder')
 
     async def update(message, args):
