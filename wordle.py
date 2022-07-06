@@ -1,12 +1,26 @@
 # wordle.py
 import re
+from dataclasses import dataclass
 
-import util
-from util import core, frequency_dict
+from util import core, frequency_dict, remove_duplicates, now_brief, ANDYINNIE_ID
 from responder import Responder
 
 RESPONDER_ID = 'wordle'
 WORDLE_CHANNEL_ID = 955236798748049468
+
+
+@dataclass
+class WordleGrid:
+    number: int
+    score: int
+    hard: bool
+    fail: bool
+
+    def __hash__(self):
+        return int(f'{self.number}{max(self.score, 0)}{1 if self.hard else 0}{1 if self.fail else 0}')
+
+    def __eq__(self, other):
+        return self.__hash__() == other.__hash__()
 
 
 def is_wordle(text):
@@ -14,6 +28,8 @@ def is_wordle(text):
 
 
 def analyze(text):
+    assert is_wordle(text)
+
     first_line_split = text.split('\n')[0].split(' ')
 
     try:
@@ -21,15 +37,16 @@ def analyze(text):
     except ValueError:
         score = -1
 
-    return {
-        'number': int(first_line_split[1]),
-        'score': score,
-        'hard': first_line_split[-1].endswith('*')
-    }
+    return WordleGrid(int(first_line_split[1]),
+                      score,
+                      first_line_split[-1].endswith('*'),
+                      score == -1)
 
 
 async def run_analysis(user_id):
     channel = core.bot.get_channel(WORDLE_CHANNEL_ID)
+
+    raw_anals = []
     scores = []
     sum = 0
     count = 0
@@ -40,20 +57,39 @@ async def run_analysis(user_id):
         if not is_wordle(m.content):
             continue
 
-        score = analyze(m.content)['score']
+        anal = analyze(m.content)
+        raw_anals.append(anal)
+
+        score = anal.score
         if score > 0:
             sum += score
             count += 1
-        scores.append(score)
+        scores.append(str(score) if score > 0 else 'X')
 
     average = sum / count
     scores_histo = dict(sorted(frequency_dict(scores).items(), key=lambda item: item[0]))
 
+    raw_anals = sorted(remove_duplicates(raw_anals), key=lambda item: item.number)
+    max_streak = 1
+    streak = 1
+    n = raw_anals[0].number
+    for anal in raw_anals[1:]:
+        if n + 1 == anal.number and not anal.fail:
+            streak += 1
+            max_streak = max(max_streak, streak)
+        else:
+            streak = 1
+        n = anal.number
+
+    clean_histo = str(scores_histo).replace('\'', '')
+
     # await channel.send('\n'.join([f'{k}: {v}' for k, v in list(scores_histo)]))
     await channel.edit(topic=f'total: {count} | '
                              f'avg: {average:.2f} | '
-                             f'scores histogram: {str(scores_histo)} | '
-                             f'updated: {util.now_brief()}')
+                             f'score dist.: {clean_histo} | '
+                             f'max streak: {max_streak} | '
+                             f'curr streak: {streak} | '
+                             f'updated: {now_brief()}')
 
 
 def load(_):
@@ -70,7 +106,7 @@ def load(_):
         print('registered wordle responder')
 
     async def update(message, args):
-        await run_analysis(util.ANDYINNIE_ID)
+        await run_analysis(ANDYINNIE_ID)
         await message.delete()
 
     if register_command():
