@@ -74,9 +74,12 @@ async def run_analysis(user_id):
     streak = 1
     n = raw_anals[0].number
     for anal in raw_anals[1:]:
-        if n + 1 == anal.number and not anal.fail:
-            streak += 1
-            max_streak = max(max_streak, streak)
+        if n + 1 == anal.number:
+            if not anal.fail:
+                streak += 1
+                max_streak = max(max_streak, streak)
+            else:
+                streak = 0
         else:
             streak = 1
         n = anal.number
