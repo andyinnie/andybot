@@ -66,6 +66,12 @@ async def run_analysis(user_id):
             count += 1
         scores.append(str(score) if score > 0 else 'X')
 
+    wins = 0
+    for s in scores:
+        if s != 'X':
+            wins += 1
+    win_rate = wins / len(scores)
+
     average = sum / count
     scores_histo = dict(sorted(frequency_dict(scores).items(), key=lambda item: item[0]))
 
@@ -92,6 +98,7 @@ async def run_analysis(user_id):
                              f'score dist.: {clean_histo} | '
                              f'max streak: {max_streak} | '
                              f'curr streak: {streak} | '
+                             f'win%: {int(win_rate * 100)} | '
                              f'updated: {now_brief()}')
 
 
