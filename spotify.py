@@ -11,7 +11,7 @@ from spotipy.cache_handler import MemoryCacheHandler
 import util
 from commandv2 import ParsyArg
 
-REDIRECT_URI = 'http://andrewjm.me:80/spotify'
+REDIRECT_URI = 'https://andrewjm.me/spotify'
 SPOTIFY_COLOR = 0x1DB954
 
 waiting_on_auth = set()
