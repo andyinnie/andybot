@@ -32,12 +32,7 @@ def load(core):
 
     @core.bot.event
     async def on_ready():  # once bot is connected to Discord
-        end_time = time.time()
-        elapsed = end_time - core.startTime
-
-        print(
-            f'{core.bot.user} connected to Discord on {util.now(date_first=True)}, taking {elapsed:.3f} seconds.'
-        )
+        print(f'{core.bot.user} connected to Discord on {util.now(date_first=True)}')
 
         autoload.load_asyncs(core)
 
