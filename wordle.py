@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import discord
 
-from util import core, frequency_dict, remove_duplicates, now_brief, ANDYINNIE_ID, now_dt, iferror
+from util import core, frequency_dict, remove_duplicates, ANDYINNIE_ID, now_dt, iferror
 from responder import Responder
 
 RESPONDER_ID = 'wordle'
@@ -166,6 +166,8 @@ async def run_analysis(user):
         name='win percentage',
         value=str(int(win_rate * 100))
     )
+
+    await channel.send(embed=embed)
 
     stats_channel = core.bot.get_channel(STATS_CHANNEL_ID)
 
