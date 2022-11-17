@@ -48,6 +48,25 @@ def load(core):
         await channel.send(' '.join(args[1:]))
     register_command()('puppet', puppet, [commandv2.Command.Check.is_andyinnie])
 
+    async def puppetdm(message, args):
+        if len(args) < 2:
+            await message.channel.send(
+                embed=util.iferror(lang()('supply.generic', 'a user ID and a message'))
+            )
+            return
+
+        try:
+            user_id = int(args[0])
+        except ValueError:
+            await message.channel.send(
+                embed=util.iferror(lang()('error.invalid.idwithtype', 'user'))
+            )
+            return
+
+        user = core.bot.get_user(user_id)
+        await user.send(' '.join(args[1:]))
+    register_command()('puppetdm', puppetdm, [commandv2.Command.Check.is_andyinnie])
+
     async def prefix(message, args):
         channel = message.channel
 

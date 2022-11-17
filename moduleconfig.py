@@ -8,6 +8,7 @@ loadlist = [
     'webhooks',
     'event',
     'serverlogging',
+    'hooks',
     'moduleconfig'
 ]
 
@@ -17,5 +18,6 @@ subscriptions = {
     'commandv2': ['reddit', 'admincommands', 'bwlists', 'spotify', 'wordle'],
     'responder': ['commandv2', 'quicksave', 'fourtwenty', 'wordle'],
     'webhooks': ['spotify'],
+    'hooks': ['wordle'],
     'moduleconfig': ['autoload']
 }

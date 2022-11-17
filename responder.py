@@ -159,7 +159,7 @@ def reply_with_embed(embed):
         return lambda message: message.channel.send(embed=embed)
 
 
-def load(core1):
+def load(_):
     whitelists = core.exports.get('whitelists')
     blacklists = core.exports.get('blacklists')
     lang = core.exports.get('lang')

@@ -2,11 +2,17 @@
 import re
 from dataclasses import dataclass
 
-from util import core, frequency_dict, remove_duplicates, now_brief, ANDYINNIE_ID
+import discord
+
+from util import core, frequency_dict, remove_duplicates, now_brief, ANDYINNIE_ID, now_dt, iferror
 from responder import Responder
 
 RESPONDER_ID = 'wordle'
-WORDLE_CHANNEL_ID = 955236798748049468
+WORDLE_SERVER_ID = 1042608545666965525
+WORDLE_CATEGORY_ID = 1042608676365684736
+STATS_CHANNEL_ID = 1042677504357437462
+
+WORDLE_COLOR = 0x538D4E
 
 
 @dataclass
@@ -21,6 +27,29 @@ class WordleGrid:
 
     def __eq__(self, other):
         return self.__hash__() == other.__hash__()
+
+
+def build_channel_name(user):
+    return f'{user.name}-{user.id}'
+
+
+async def create_channel(member):
+    guild = core.bot.get_guild(WORDLE_SERVER_ID)
+    return await core.bot.get_channel(WORDLE_CATEGORY_ID).create_text_channel(
+        build_channel_name(member),
+        overwrites={
+            guild.default_role: discord.PermissionOverwrite(view_channel=False),
+            guild.get_member(member.id): discord.PermissionOverwrite(view_channel=True)
+        }
+    )
+
+
+async def get_or_create_channel_by_user(member):
+    for channel in core.bot.get_guild(WORDLE_SERVER_ID).channels:
+        if channel.name.endswith(str(member.id)):
+            return channel
+
+    return await create_channel(member)
 
 
 def is_wordle(text):
@@ -43,19 +72,32 @@ def analyze(text):
                       score == -1)
 
 
-async def run_analysis(user_id):
-    channel = core.bot.get_channel(WORDLE_CHANNEL_ID)
+async def run_analysis(user):
+    channel = await get_or_create_channel_by_user(user)
 
     raw_anals = []
     scores = []
     sum = 0
     count = 0
     async for m in channel.history(limit=None):
-        if m.author.id != user_id:
-            continue
+        # crazy guard clause logic here, be careful
+        # author:      | content:   | action:
+        # -------------+------------+--------
+        # bot          | wordle     | analyze
+        # bot          | not wordle | delete
+        # correct user | wordle     | analyze
+        # correct user | not wordle | skip
+        # other user   | anything   | skip
+        if m.author.id == core.bot.user.id:
+            if not is_wordle(m.content):
+                await m.delete()
+                continue
+        else:
+            if m.author.id != user.id:
+                continue
 
-        if not is_wordle(m.content):
-            continue
+            if not is_wordle(m.content):
+                continue
 
         anal = analyze(m.content)
         raw_anals.append(anal)
@@ -93,21 +135,67 @@ async def run_analysis(user_id):
     clean_histo = str(scores_histo).replace('\'', '')
 
     # await channel.send('\n'.join([f'{k}: {v}' for k, v in list(scores_histo)]))
-    await channel.edit(topic=f'total: {count} | '
-                             f'avg: {average:.2f} | '
-                             f'score dist.: {clean_histo} | '
-                             f'max streak: {max_streak} | '
-                             f'curr streak: {streak} | '
-                             f'win%: {int(win_rate * 100)} | '
-                             f'updated: {now_brief()}')
+    # await channel.edit(topic=f'total: {count} | '
+    #                          f'avg: {average:.2f} | '
+    #                          f'score dist.: {clean_histo} | '
+    #                          f'max streak: {max_streak} | '
+    #                          f'curr streak: {streak} | '
+    #                          f'win%: {int(win_rate * 100)} | '
+    #                          f'updated: {now_brief()}')
+
+    embed = discord.Embed(
+        title=f'{user.name}\'s Stats',
+        color=WORDLE_COLOR,
+        timestamp=now_dt()
+    ).add_field(
+        name='total',
+        value=str(count)
+    ).add_field(
+        name='average',
+        value=f'{average:.2f}'
+    ).add_field(
+        name='score distribution',
+        value=str(clean_histo)
+    ).add_field(
+        name='current streak',
+        value=str(streak)
+    ).add_field(
+        name='longest streak',
+        value=str(max_streak)
+    ).add_field(
+        name='win percentage',
+        value=str(int(win_rate * 100))
+    )
+
+    stats_channel = core.bot.get_channel(STATS_CHANNEL_ID)
+
+    async for m in stats_channel.history(limit=None):
+        if str(user.id) in m.content:
+            await m.edit(embed=embed)
+            return
+
+    await stats_channel.send(content=f'||{user.id}||', embed=embed)
 
 
-def load(_):
+def check(message):
+    if message.channel.guild.id != WORDLE_SERVER_ID:
+        return False  # wrong server
+
+    if str(message.author.id) not in message.channel.name:
+        return False  # not their channel
+
+    if not is_wordle(message.content):
+        return False
+
+    return True
+
+
+def load(core):
     register_responder = core.exports.get('responder/register')
     register_command = core.exports.get('command/register')
+    register_hook = core.exports.get('register_hook')
 
-    wordle_responder = Responder(lambda message: message.channel.id == WORDLE_CHANNEL_ID and is_wordle(message.content),
-                                 lambda message: run_analysis(message.author.id))
+    wordle_responder = Responder(check, lambda message: run_analysis(message.author))
 
     wordle_responder.id = RESPONDER_ID
 
@@ -119,6 +207,41 @@ def load(_):
         await run_analysis(ANDYINNIE_ID)
         await message.delete()
 
+    async def stats(message, args):
+        if str(message.author.id) not in message.channel.name:
+            message.channel.send(embed=iferror('You are not in your channel!'))
+            return
+
+        await message.delete()
+        await run_analysis(message.author)
+
+    async def wordletransfer(message, args):
+        member = core.bot.get_guild(WORDLE_SERVER_ID).get_member(message.author.id)
+        if member is None:
+            message.channel.send(embed=iferror('You are not in the Wordle server!'))
+            return
+
+        target_channel = await get_or_create_channel_by_user(member)
+        async for m in message.channel.history(limit=None, oldest_first=True):
+            if m.author.id != member.id:
+                continue
+
+            if not is_wordle(m.content):
+                continue
+
+            await target_channel.send(m.content)
+
     if register_command():
-        register_command()('update', update, [lambda message: message.channel.id == WORDLE_CHANNEL_ID])
-        print('registered wordle update command')
+        register_command()('stats', stats, [lambda message: message.channel.guild.id == WORDLE_SERVER_ID])
+        register_command()('wordletransfer', wordletransfer, [])
+        print('registered wordle commands')
+
+    async def join_hook(member):
+        if member.guild.id != WORDLE_SERVER_ID:
+            return
+
+        await get_or_create_channel_by_user(member)
+
+    if register_hook():
+        register_hook()('member_join', 'wordleserver', join_hook)
+        print('registered wordle join hook')

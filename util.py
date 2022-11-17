@@ -11,6 +11,7 @@ import discord
 from lang import lang
 
 ANDYINNIE_ID = 428332264204533770
+WORDLE_SERVER_ID = 1042608545666965525
 PACIFIC_TIME = pytz.timezone('America/Los_Angeles')
 BOT_VERSION = '2.4'
 

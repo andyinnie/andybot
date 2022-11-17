@@ -53,12 +53,13 @@ async def channel_provider(channel_id):
         return channel
 
 
-load_dotenv()
+if __name__ == '__main__':
+    load_dotenv()
 
-autoload.load_initial(modules[__name__])
+    autoload.load_initial(modules[__name__])
 
-TOKEN = getenv('DISCORD_TOKEN')
+    TOKEN = getenv('DISCORD_TOKEN')
 
-print('Connecting to Discord...')
-startTime = time()
-bot.run(TOKEN, bot=True)
+    print('Connecting to Discord...')
+    startTime = time()
+    bot.run(TOKEN, bot=True)

@@ -1,15 +1,12 @@
 # event.py
 import random
 import sys
-import time
 import traceback
-from datetime import timedelta
 
 import discord
 
 import util
 import responder
-import webhooks
 import autoload
 
 
@@ -25,6 +22,7 @@ def load(core):
     whitelists = core.exports.get('whitelists')
     lang = core.exports.get('lang')
     webhooks = core.exports.get('webhook/hooks')
+    hooks = core.exports.get('hooks')
 
     # ============================== #
     # ========== ON READY ========== #
@@ -140,6 +138,12 @@ def load(core):
         message = await channel.fetch_message(payload.message_id)
         if message.author == core.bot.user:
             await message.add_reaction(payload.emoji)
+
+    @core.bot.event
+    async def on_member_join(member):
+        if hooks():
+            for hook_obj in hooks()['member_join']:
+                await hook_obj.func(member)
 
     @core.bot.event
     async def on_load_require_async(module):
