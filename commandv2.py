@@ -255,7 +255,7 @@ def load(core):
             timestamp=util.now_dt()
         ).set_author(
             name=f'{user.name}#{user.discriminator}',
-            icon_url=user.avatar_url
+            icon_url=user.avatar.url
         ).add_field(
             name='Command prefix',
             value=f'`{get_prefix(guild.id)}` ({guild.name})'
@@ -264,7 +264,7 @@ def load(core):
             value=f'{andyinnie.name}#{andyinnie.discriminator}'
         ).add_field(
             name='Created on',
-            value=str(util.PACIFIC_TIME.fromutc(user.created_at).date())
+            value=str(user.created_at.astimezone(util.PACIFIC_TIME).date())
         ).add_field(
             name='Bot Version',
             value=util.BOT_VERSION

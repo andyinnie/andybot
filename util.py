@@ -104,7 +104,7 @@ class FakeMessage:
 
 
 def is_time(utc, strtime, military=False, tz=PACIFIC_TIME):
-    as_tz = tz.fromutc(utc)
+    as_tz = utc.astimezone(tz)
 
     split = strtime.split(':')
     hour, minute = int(split[0]), int(split[1])

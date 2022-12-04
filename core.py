@@ -4,6 +4,7 @@ from sys import modules
 from time import time
 
 from discord import Intents
+from discord.app_commands import CommandTree, command
 from discord.ext import commands
 from dotenv import load_dotenv
 
@@ -11,7 +12,7 @@ import autoload
 
 print('Hello world, core.py here!')
 
-bot = commands.Bot(command_prefix='_', intents=Intents.all())
+bot = commands.Bot(command_prefix='_', intents=Intents.all(), tree_cls=CommandTree)
 
 
 class Exports:
@@ -62,4 +63,4 @@ if __name__ == '__main__':
 
     print('Connecting to Discord...')
     startTime = time()
-    bot.run(TOKEN, bot=True)
+    bot.run(TOKEN)

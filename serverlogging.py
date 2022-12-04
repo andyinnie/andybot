@@ -32,7 +32,7 @@ def load(core):
             timestamp=util.now_dt()
         ).set_author(
             name=f'{author.name}#{author.discriminator}',
-            icon_url=author.avatar_url
+            icon_url=author.avatar.url
         ).add_field(
             name='Before',
             value=util.shorten(before.content, 1024) if before.content else "*empty message*",
@@ -83,7 +83,7 @@ def load(core):
             timestamp=util.now_dt()
         ).set_author(
             name=f'{author.name}#{author.discriminator}',
-            icon_url=author.avatar_url
+            icon_url=author.avatar.url
         )
 
         await logging_channel.send(embed=embed)
@@ -147,7 +147,7 @@ def load(core):
                         timestamp=util.now_dt()
                     ).set_author(
                         name=f'{before.name}#{before.discriminator}',
-                        icon_url=before.avatar_url
+                        icon_url=before.avatar.url
                     ).add_field(
                         name='Before',
                         value=before_val,
@@ -161,7 +161,7 @@ def load(core):
             # await internal(before.status, after.status, 'status')
             await internal(before.nick, after.nick, 'nickname')
         else:
-            await internal(before.avatar_url, after.avatar_url, 'avatar')
+            await internal(before.avatar.url, after.avatar.url, 'avatar')
             await internal(before.name, after.name, 'username')
             await internal(before.discriminator, after.discriminator, 'discriminator')
 

@@ -9,6 +9,7 @@ loadlist = [
     'event',
     'serverlogging',
     'hooks',
+    'app_commands',
     'moduleconfig'
 ]
 

@@ -518,7 +518,7 @@ def load(_):
                                               'Howdy!',
                                               'what do you want?',
                                               'You called?',
-                                              util.PACIFIC_TIME.fromutc(message.created_at).strftime(
+                                              message.created_at.astimezone(util.PACIFIC_TIME).strftime(
                                                   'cannot believe you pinged me at %I:%M %p'
                                               ).replace(' 0', ' ').casefold(),
                                               'Who said my name?',

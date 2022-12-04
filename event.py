@@ -37,6 +37,8 @@ def load(core):
         await core.bot.get_channel(942838937427271771).send('i am here')
         await core.bot.get_channel(859629975932895252).send('i am here')
 
+        await core.bot.tree.sync()
+
         # game = discord.Game(name='_help')
         # await core.bot.change_presence(activity=game)
 
@@ -135,6 +137,10 @@ def load(core):
             return
 
         channel = core.bot.get_guild(payload.guild_id).get_channel(payload.channel_id)
+        if channel is None:
+            # eh
+            return
+
         message = await channel.fetch_message(payload.message_id)
         if message.author == core.bot.user:
             await message.add_reaction(payload.emoji)
