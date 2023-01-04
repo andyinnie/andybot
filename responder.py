@@ -278,7 +278,7 @@ def load(_):
         # ======== HIGH PRIORITY ======= #
         # ============================== #
 
-        Responder(build_cont_checker(KeywordMode.contains, ['dQw4', 'j5a0', 'V-_O', 'Lrj2',
+        Responder(build_cont_checker(KeywordMode.contains, ['dQw4', 'j5a0', 'V-_O', 'Lrj2', 'o-YB',
                                                             'thisworldthesedays.com',
                                                             'tomorrowtides.com',
                                                             'theraleighregister.com',
