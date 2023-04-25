@@ -1,4 +1,5 @@
 # spotify.py
+from html import unescape
 from os import getenv
 from requests.exceptions import ReadTimeout
 from datetime import timedelta
@@ -119,7 +120,7 @@ def load(core):
         while True:
             response = spotify.playlist_items(args['playlist_id'],
                                               offset=offset,
-                                              fields=f'items(is_local,track(artists(id)))',
+                                              fields=f'items(is_local,track(artists(id,name)))',
                                               additional_types=['track'])
 
             if len(response['items']) == 0:
@@ -143,12 +144,21 @@ def load(core):
 
         # compile all artists in a giant list, include repeats
         raw_artists = []
+        raw_artist_names = []
         for track in tracks:
             for a in track['artists']:
+                print(a)
                 raw_artists.append(a['id'])
+                raw_artist_names.append(a['name'])
 
         # put raw artist list into frequency dict
         artist_frequencies = util.frequency_dict(raw_artists)
+        artist_name_freq = util.frequency_dict(raw_artist_names)
+
+        def sort_dict(d, reverse=True):
+            return dict(sorted(d.items(), key=lambda item: item[1], reverse=reverse))
+
+        artist_name_freq = sort_dict(artist_name_freq)
 
         flattened_artists = tuple(artist_frequencies.keys())
         arist_genres = dict()
@@ -174,7 +184,7 @@ def load(core):
             raw_genres += g * artist_frequencies[a]
 
         genre_frequencies = util.frequency_dict(raw_genres)
-        genre_frequencies = dict(sorted(genre_frequencies.items(), key=lambda item: item[1], reverse=True))
+        genre_frequencies = sort_dict(genre_frequencies)
 
         if 'limit' in args:
             if args['limit'] < 0:
@@ -185,25 +195,43 @@ def load(core):
         else:
             num = 10
 
+        def stringify(d, values=True):
+            if values:
+                line = lambda k, v: f'{k}: **{v/len(tracks):.2f}**'
+            else:
+                line = lambda k, v: f'{k}'
+            return '\n'.join([line(k, v) for k, v in list(d.items())[:num]])
+
         embed = discord.Embed(
             title=playlist_metadata["name"],
             # this is nice to have but it looks wayyy better without it
             # description=unescape(playlist_metadata['description']),
             url=playlist_metadata['external_urls']['spotify'],
             color=SPOTIFY_COLOR,
-            timestamp=util.now_dt()
-        ).add_field(
-            name='Tracks',
-            value=playlist_metadata['tracks']['total']
+            # timestamp=util.now_dt()
         ).add_field(
             name='Followers',
             value=playlist_metadata['followers']['total']
         ).add_field(
+            name='Tracks',
+            value=playlist_metadata['tracks']['total']
+        ).add_field(
+            name='Unique artists',
+            value=len(artist_frequencies)
+        ).add_field(
+            name='Unique genres',
+            value=len(genre_frequencies)
+        ).add_field(
+            name='Top artists',
+            value=util.shorten(stringify(artist_name_freq, False), 1024)
+        ).add_field(
             name='Genre analysis',
-            value=util.shorten(
-                '\n'.join([f'{k}: **{v/len(tracks):.2f}**' for k, v in list(genre_frequencies.items())[:num]]), 1024
-            )
-        ).set_thumbnail(url=playlist_metadata['images'][0]['url'])
+            value=util.shorten(stringify(genre_frequencies), 1024)
+        ).set_thumbnail(
+            url=playlist_metadata['images'][0]['url']
+        ).set_footer(
+            text=unescape(playlist_metadata['description'])
+        )
 
         # await message.channel.send(embed=embed)
         return {'embed': embed}
