@@ -74,7 +74,7 @@ example_arg_defs = {
 }
 
 
-def argparse(arg_defs: dict[str, ParsyArg], function: callable):
+def argparse(arg_defs, function: callable):
     async def internal(message, args):
         new_args = dict()
 

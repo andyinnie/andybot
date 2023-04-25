@@ -1,10 +1,13 @@
 # wordle.py
+import os
 import re
 from dataclasses import dataclass
+import matplotlib.pyplot as plt
 
 import discord
 
-from util import core, frequency_dict, remove_duplicates, ANDYINNIE_ID, now_dt, iferror
+from util import core, frequency_dict, remove_duplicates, ANDYINNIE_ID, now_dt, iferror, now_nums_only, ifinfo, \
+    ifsuccess
 from responder import Responder
 
 RESPONDER_ID = 'wordle'
@@ -143,6 +146,63 @@ async def run_analysis(user):
     #                          f'win%: {int(win_rate * 100)} | '
     #                          f'updated: {now_brief()}')
 
+    def scatter():
+        # score scatter plot
+        plot_nums = [a.number for a in raw_anals]
+        plot_scores = [a.score for a in raw_anals]
+        plot_scores = [(s if s > 0 else None) for s in plot_scores]
+
+        fig, ax = plt.subplots()
+
+        ax.scatter(plot_nums, plot_scores)
+
+        ax.set(xlabel='Wordle number', ylabel='Tries',
+               title=f'{user.name}\'s Wordle Scores')
+        ax.grid()
+
+        filename = f'{user.name}-scatter-{now_nums_only()}.png'
+        fig.savefig(filename, transparent=True)
+        print(f'Saved scatter plot as {filename}')
+
+        return filename
+
+    def bar():
+        # score histogram bar plot
+        x = []
+        y = []
+        for k, v in scores_histo.items():
+            x.append(k)
+            y.append(v)
+
+        fig, ax = plt.subplots()
+
+        bars = ax.bar(x, y, color='#538D4E')
+
+        # ax.set_xlabel('Tries', color='white')
+        # ax.set_ylabel('Count', color='white')
+        # ax.set_title(f'{user.name}\'s Wordle Scores', color='white')
+
+        ax.tick_params(labelcolor='white', labelleft=False, left=False, bottom=False)
+        for spine in ax.spines.values():
+            spine.set_edgecolor((0, 0, 0, 0))
+
+        ax.bar_label(bars, color='white')
+
+        fig.set_figheight(2.5)
+
+        filename = f'{user.name}-bar-{now_nums_only()}.png'
+        fig.savefig(filename, transparent=True, bbox_inches='tight')
+        print(f'Saved bar plot as {filename}')
+
+        return filename
+
+    scatter_filename = scatter()
+    bar_filename = bar()
+
+    def delete_files():
+        os.remove(scatter_filename)
+        os.remove(bar_filename)
+
     embed = discord.Embed(
         title=f'{user.name}\'s Stats',
         color=WORDLE_COLOR,
@@ -153,9 +213,9 @@ async def run_analysis(user):
     ).add_field(
         name='average',
         value=f'{average:.2f}'
-    ).add_field(
-        name='score distribution',
-        value=str(clean_histo)
+    # ).add_field(
+    #     name='score distribution',
+    #     value=str(clean_histo)
     ).add_field(
         name='current streak',
         value=str(streak)
@@ -165,18 +225,26 @@ async def run_analysis(user):
     ).add_field(
         name='win percentage',
         value=str(int(win_rate * 100))
+    ).set_image(
+        url=f'attachment://{bar_filename}'
     )
 
-    await channel.send(embed=embed)
+    def get_file():
+        return discord.File(f'{os.getcwd()}/{bar_filename}', filename=bar_filename)
+
+    await channel.send(embed=embed, file=get_file())
 
     stats_channel = core.bot.get_channel(STATS_CHANNEL_ID)
 
     async for m in stats_channel.history(limit=None):
         if str(user.id) in m.content:
-            await m.edit(embed=embed)
+            await m.edit(embed=embed, attachments=[get_file()])
+            delete_files()
             return
 
-    await stats_channel.send(content=f'||{user.id}||', embed=embed)
+    await stats_channel.send(content=f'||{user.id}||', embed=embed, file=get_file())
+
+    delete_files()
 
 
 def check(message):
@@ -220,8 +288,10 @@ def load(core):
     async def wordletransfer(message, args):
         member = core.bot.get_guild(WORDLE_SERVER_ID).get_member(message.author.id)
         if member is None:
-            message.channel.send(embed=iferror('You are not in the Wordle server!'))
+            await message.channel.send(embed=iferror('You are not in the Wordle server!'))
             return
+
+        await message.channel.send(embed=ifinfo('Staring Wordle transfer...'))
 
         target_channel = await get_or_create_channel_by_user(member)
         async for m in message.channel.history(limit=None, oldest_first=True):
@@ -232,6 +302,8 @@ def load(core):
                 continue
 
             await target_channel.send(m.content)
+
+        await message.channel.send(embed=ifsuccess('Transfer completed!'))
 
     if register_command():
         register_command()('stats', stats, [lambda message: message.channel.guild.id == WORDLE_SERVER_ID])

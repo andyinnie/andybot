@@ -7,6 +7,7 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 import util
+from util import colorize
 from moduleconfig import loadlist, subscriptions
 
 observer = Observer()
@@ -26,17 +27,26 @@ for module in loadlist:
     recursively_add_to_watchlist(module)
 
 
-def load_initial(core):
-    for name in watchlist:
+def load_one(core, name):
+    try:
         exec(f'import {name}')
         if hasattr(module := sys.modules[name], 'load'):
             print(f'Initial load of {name}')
             module.load(core)
+    except Exception as e:
+        print(colorize(f'&cFailed to load module {name}: {e.__class__.__name__}: {e}'))
+
+def load_initial(core):
+    for name in watchlist:
+        load_one(core, name)
         print()
 
 
 def load_asyncs(core):
     for w in watchlist:
+        if w not in sys.modules:
+            print(colorize(f'&6Tried to load_async on module {w} but it was never loaded!'))
+            continue
         if hasattr(module := sys.modules[w], 'load_async'):
             print()
             core.bot.dispatch('load_require_async', module)
@@ -53,6 +63,11 @@ def reload_filename(filename, core):
         await channel.send(embed=util.ifinfo(reloading_str_2))
 
     await_this()(shit())
+
+    if filename not in sys.modules:
+        print(colorize(f'&6Trying to reload module {filename} (it was not loaded already)...'))
+        load_one(core, filename)
+        return
 
     module = sys.modules[filename]
     print(reloading_str)

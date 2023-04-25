@@ -423,15 +423,15 @@ def load(_):
         # ========== ENDS WITH ========= #
         # ============================== #
 
-        Responder(build_cont_checker(KeywordMode.ends, 'lol'),
-                  reply_with('*Ha! ha! ha! --he! he! he! --a very good joke, indeed --an excellent jest.*')),
+        # Responder(build_cont_checker(KeywordMode.ends, 'lol'),
+        #           reply_with('*Ha! ha! ha! --he! he! he! --a very good joke, indeed --an excellent jest.*')),
 
         # ============================== #
         # ========== CONTAINS ========== #
         # ============================== #
 
-        Responder(build_cont_checker(KeywordMode.word, ['minecraft', 'bees']),
-                  reply_with('guys they added bees to minecraft')),
+        # Responder(build_cont_checker(KeywordMode.word, ['minecraft', 'bees']),
+        #           reply_with('guys they added bees to minecraft')),
         # Responder(build_cont_checker(KeywordMode.word, 'gay'),
         #           reply_with('gay thoughts')),
         Responder(build_cont_checker(KeywordMode.word,

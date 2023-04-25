@@ -5,7 +5,7 @@ import traceback
 
 import discord
 
-import util
+from util import now, iferror, colorize
 import responder
 import autoload
 
@@ -30,7 +30,7 @@ def load(core):
 
     @core.bot.event
     async def on_ready():  # once bot is connected to Discord
-        print(f'{core.bot.user} connected to Discord on {util.now(date_first=True)}')
+        print(f'{core.bot.user} connected to Discord on {now(date_first=True)}')
 
         autoload.load_asyncs(core)
 
@@ -54,7 +54,7 @@ def load(core):
                 return
 
         print('----------on_error----------')
-        error_printout = f'Time: {util.now(date_first=True)}\n'
+        error_printout = f'&cTime: {now(date_first=True)}\n'
 
         error_printout += f'Discord information:\n{event}\n'
         for a in args:
@@ -63,7 +63,7 @@ def load(core):
             error_printout += str(k)
 
         if isinstance(args[0], discord.Message):
-            await args[0].channel.send(embed=util.iferror(lang()('error.unknown')))
+            await args[0].channel.send(embed=iferror(lang()('error.unknown')))
             error_printout += '\nMessage content: ' + args[0].content
 
         error_printout += '\nPython information:'
@@ -73,7 +73,7 @@ def load(core):
         error_printout += ''.join(traceback.format_tb(info[2]))
 
         if len(error_printout) > 2000:
-            fp = f'logs/{util.now()}.txt'
+            fp = f'logs/{now()}.txt'
             with open(fp, 'w') as file:
                 file.write(error_printout)
             discord_file = discord.File(fp)
@@ -81,7 +81,7 @@ def load(core):
         else:
             await core.bot.get_channel(ERROR_CHANNEL_ID).send(error_printout)
 
-        print(error_printout)
+        print(colorize(error_printout))
         print('--------end on_error--------')
 
     # ============================== #
@@ -122,7 +122,7 @@ def load(core):
 
         for r in (responders() if use_all else priority_responders()):
             if await r.respond(message):
-                print(f'Just responded to a message at {util.now()}')
+                print(f'Just responded to a message at {now()}')
                 if r.continue_after:
                     continue
                 return

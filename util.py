@@ -78,6 +78,10 @@ def now_brief():
     return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
 
+def now_nums_only():
+    return datetime.datetime.now().strftime('%Y%m%d%H%M%S')
+
+
 def now_dt():
     return datetime.datetime.now(pytz.timezone('America/Los_Angeles'))
 
@@ -129,3 +133,40 @@ def frequency_dict(raw_list):
 
 async def async_nothing():
     pass
+
+
+def colorize(text):
+    # https://www.lihaoyi.com/post/BuildyourownCommandLinewithANSIescapecodes.html#256-colors
+    def ansi(code):
+        return f'\u001b[38;5;{code}m'
+
+    colors = {
+        '0': ansi(0),
+        '1': ansi(4),
+        '2': ansi(2),
+        '3': ansi(6),
+        '4': ansi(1),
+        '5': ansi(5),
+        '6': ansi(3),
+        '7': ansi(7),
+        '8': ansi(8),
+        '9': ansi(12),
+        'a': ansi(10),
+        'b': ansi(14),
+        'c': ansi(9),
+        'd': ansi(13),
+        'e': ansi(11),
+        'f': ansi(15),
+        'l': '\u001b[1m',
+        'n': '\u001b[4m',
+        'r': '\u001b[0m',
+    }
+
+    colorized = text
+    for k, v in colors.items():
+        colorized = colorized.replace(f'&{k}', v)
+
+    colorized += colors['r']
+    return colorized
+
+

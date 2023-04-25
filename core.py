@@ -44,7 +44,8 @@ channel_cache = dict()
 
 
 async def channel_provider(channel_id):
-    if channel := bot.get_channel(channel_id):
+    channel = bot.get_channel(channel_id)
+    if channel:
         return channel
     elif channel_id in channel_cache.keys():
         return channel_cache[channel_id]
