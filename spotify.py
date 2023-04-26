@@ -147,7 +147,6 @@ def load(core):
         raw_artist_names = []
         for track in tracks:
             for a in track['artists']:
-                print(a)
                 raw_artists.append(a['id'])
                 raw_artist_names.append(a['name'])
 
