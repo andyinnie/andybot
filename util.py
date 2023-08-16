@@ -135,6 +135,17 @@ async def async_nothing():
     pass
 
 
+def await_this(coro):
+    core.bot.dispatch('await_this', coro)
+
+
+def register_slash_command(command):
+    name = command.name
+    core.bot.tree.remove_command(name)
+    core.bot.tree.add_command(command)
+    await_this(core.bot.tree.sync())
+
+
 def colorize(text):
     # https://www.lihaoyi.com/post/BuildyourownCommandLinewithANSIescapecodes.html#256-colors
     def ansi(code):

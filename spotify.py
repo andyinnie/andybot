@@ -5,11 +5,12 @@ from requests.exceptions import ReadTimeout
 from datetime import timedelta
 
 import discord
+from discord import app_commands, Interaction
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 from spotipy.cache_handler import MemoryCacheHandler
 
-import util
+from util import ifinfo, now_dt, ifwarn, shorten, frequency_dict, ifsuccess, iferror, register_slash_command
 from commandv2 import ParsyArg
 
 REDIRECT_URI = 'https://andrewjm.me/spotify'
@@ -45,11 +46,12 @@ def load(core):
 
     spotify = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials(), requests_timeout=10)
 
+    # TODO: figure out how to make these into decorators
     def require_auth(function, scope):
         async def _internal(message, args):
             reason = None
             if (state := message.author.id) in user_spotifies:
-                if util.now_dt() < user_spotifies[message.author.id]['expires']:
+                if now_dt() < user_spotifies[message.author.id]['expires']:
                     client = user_spotifies[message.author.id]['client']
 
                     try:
@@ -79,7 +81,47 @@ def load(core):
             # ))
             waiting_on_auth.add(state)
             return {
-                "embed": util.ifinfo((f'{reason}\n' if reason else '') +
+                "embed": ifinfo((f'{reason}\n' if reason else '') +
+                                     'I\'ve DMed you a link - click on it to authorize Spotify.\n'
+                                     'When you\'re done, repeat the command.')
+            }
+        return _internal
+
+    def require_auth_slash(function, scope):
+        async def _internal(interaction: Interaction):
+            reason = None
+            if (state := interaction.user.id) in user_spotifies:
+                if now_dt() < user_spotifies[interaction.user.id]['expires']:
+                    client = user_spotifies[interaction.user.id]['client']
+
+                    try:
+                        return await function(interaction, client)
+                    except spotipy.exceptions.SpotifyException as e:
+                        if e.http_status == 403:
+                            # invalid scope, send a new auth link with correct scope
+                            reason = 'The last time you authorized, it was for a different command. '\
+                                     'You\'ll need to reauthorize.'
+                        else:
+                            raise e
+                else:
+                    reason = 'Authorization timed out.'
+
+                del user_spotifies[interaction.user.id]
+
+            await interaction.user.send(SpotifyOAuth.OAUTH_AUTHORIZE_URL +
+                                      f'?client_id={getenv("SPOTIPY_CLIENT_ID")}'
+                                      '&response_type=code'
+                                      f'&redirect_uri={REDIRECT_URI}'
+                                      f'&state={state}'
+                                      f'&scope={scope}')  # kek
+            # await message.channel.send(embed=util.ifinfo(
+            #     (f'{reason}\n' if reason else '') +
+            #     'I\'ve DMed you a link - click on it to authorize Spotify.\n'
+            #     'When you\'re done, repeat the command.'
+            # ))
+            waiting_on_auth.add(state)
+            return {
+                "embed": ifinfo((f'{reason}\n' if reason else '') +
                                      'I\'ve DMed you a link - click on it to authorize Spotify.\n'
                                      'When you\'re done, repeat the command.')
             }
@@ -92,7 +134,20 @@ def load(core):
                     response = await function(message, args)
                 await message.channel.send(**response)
             except ReadTimeout as e:
-                await message.channel.send(embed=util.iferror(
+                await message.channel.send(embed=iferror(
+                    'Request timed out, please try again.'
+                ))
+                return
+        return _internal
+
+    def catch_timeout_slash(function):
+        async def _internal(interaction: Interaction):
+            try:
+                async with interaction.channel.typing():
+                    response = await function(interaction)
+                await interaction.response.send_message(**response)
+            except ReadTimeout as e:
+                await interaction.response.send_message(embed=iferror(
                     'Request timed out, please try again.'
                 ))
                 return
@@ -106,11 +161,11 @@ def load(core):
             )
         except spotipy.exceptions.SpotifyException as e:
             if e.http_status == 404:
-                return {'embed': util.iferror(
+                return {'embed': iferror(
                     lang()('error.invalid.generic', 'playlist ID or share link')
                 )}
             else:
-                return {'embed': util.iferror(
+                return {'embed': iferror(
                     lang()('error.unknown') + f'\n{str(e)}'
                 )}
 
@@ -138,7 +193,7 @@ def load(core):
             offset = offset + len(response['items'])
 
         if len(tracks) == 0:
-            return {'embed': util.iferror(
+            return {'embed': iferror(
                 'That playlist is empty, silly! (or something went horribly wrong behind the scenes here)'
             )}
 
@@ -151,8 +206,8 @@ def load(core):
                 raw_artist_names.append(a['name'])
 
         # put raw artist list into frequency dict
-        artist_frequencies = util.frequency_dict(raw_artists)
-        artist_name_freq = util.frequency_dict(raw_artist_names)
+        artist_frequencies = frequency_dict(raw_artists)
+        artist_name_freq = frequency_dict(raw_artist_names)
 
         def sort_dict(d, reverse=True):
             return dict(sorted(d.items(), key=lambda item: item[1], reverse=reverse))
@@ -182,12 +237,12 @@ def load(core):
         for a, g in arist_genres.items():
             raw_genres += g * artist_frequencies[a]
 
-        genre_frequencies = util.frequency_dict(raw_genres)
+        genre_frequencies = frequency_dict(raw_genres)
         genre_frequencies = sort_dict(genre_frequencies)
 
         if 'limit' in args:
             if args['limit'] < 0:
-                return {'embed': util.iferror(
+                return {'embed': iferror(
                     'Number of results should be positive'
                 )}
             num = args['limit']
@@ -222,10 +277,10 @@ def load(core):
             value=len(genre_frequencies)
         ).add_field(
             name='Top artists',
-            value=util.shorten(stringify(artist_name_freq, False), 1024)
+            value=shorten(stringify(artist_name_freq, False), 1024)
         ).add_field(
             name='Genre analysis',
-            value=util.shorten(stringify(genre_frequencies), 1024)
+            value=shorten(stringify(genre_frequencies), 1024)
         ).set_thumbnail(
             url=playlist_metadata['images'][0]['url']
         ).set_footer(
@@ -235,42 +290,191 @@ def load(core):
         # await message.channel.send(embed=embed)
         return {'embed': embed}
 
+
+    @app_commands.command()
+    @app_commands.choices(term=[
+        app_commands.Choice(name='short', value='short_term'),
+        app_commands.Choice(name='medium', value='medium_term'),
+        app_commands.Choice(name='long', value='long_term'),
+    ])
+    @app_commands.choices(list=[
+        app_commands.Choice(name='tracks', value='tracks'),
+        app_commands.Choice(name='artists', value='artists'),
+    ])
+    async def spotifystats(interaction: Interaction, term: str, list: str, limit: int) -> None:
+        # await catch_timeout_slash(require_auth_slash(me_slash, 'user-top-read'))(interaction)
+        try:
+            client = user_spotifies[interaction.user.id]['client']
+        except KeyError:
+            await interaction.response.send_message('no client?')
+            return
+
+        # TODO: PLEASE REFACTOR THIS
+        async def _internal():
+            def top_tracks(limit, term):
+                result = client.current_user_top_tracks(limit=limit, time_range=term)
+
+                lines = []
+                for item in result['items']:
+                    name = item['name']
+                    artists = item['artists']
+                    lines.append(f'{", ".join([a["name"] for a in artists])} - {name}')
+
+                lines = [f'{i + 1}. {l}' for i, l in enumerate(lines)]
+                return lines
+
+            def top_artists(limit, term):
+                result = client.current_user_top_artists(limit=limit, time_range=term)
+
+                lines = []
+                for item in result['items']:
+                    name = item['name']
+                    lines.append(name)
+
+                lines = [f'{i + 1}. {l}' for i, l in enumerate(lines)]
+                return lines
+
+            # terms = ['short_term', 'medium_term', 'long_term']
+            # term = terms[0]
+            # if len(args) >= 1:
+            #     try:
+            #         idx = int(args[0])
+            #         term = terms[idx]
+            #     except ValueError:
+            #         return {'embed': iferror(
+            #             f'Invalid argument `{args[0]}`. Provide a number representing a time range:\n' +
+            #             ', '.join([f'{i}: {t}' for i, t in enumerate(terms)])
+            #         )}
+            #     except IndexError:
+            #         return {'embed': iferror(
+            #             f'Invalid choice of time range. Please choose a number 0-{len(terms) - 1}.'
+            #         )}
+
+            lists = {
+                'tracks': (top_tracks, 'Your top % tracks'),
+                'artists': (top_artists, 'Your top % artists'),
+            }
+            chosen_list = list
+            # if len(args) >= 2:
+            #     if args[1] in lists.keys():
+            #         chosen_list = args[1]
+            #     else:
+            #         await message.channel.send(
+            #             embed=ifwarn(f'Invalid list type: `{args[1]}`. Defaulting to top tracks'))
+            #
+            # limit = None
+            # if len(args) >= 3:
+            #     try:
+            #         limit = int(args[2])
+            #     except ValueError:
+            #         await message.channel.send(embed=ifwarn(f'Invalid limit: `{args[2]}`. Defaulting to 10.'))
+            # if limit is None:
+            #     limit = 10
+
+            callback, verbiage = lists[chosen_list]
+
+            lines = callback(limit, term)
+
+            term_verbiage = {
+                'short_term': 'from the last month',
+                'medium_term': 'from the last 6 months',
+                'long_term': 'of all time'
+            }[term]
+
+            title = verbiage.replace('%', str(limit)) + ' ' + term_verbiage
+
+            embed = discord.Embed(
+                title=title,
+                description=shorten('\n'.join(lines), 2000),
+                color=SPOTIFY_COLOR
+            )
+            # await message.channel.send(embed=embed)
+            return {'embed': embed}
+
+        result = await _internal()
+        await interaction.response.send_message(**result)
+
+    register_slash_command(spotifystats)
+
+    async def me_slash(interaction: Interaction, client):
+        ...
+
+
     async def me(message, args, client):
+        def top_tracks(limit, term):
+            result = client.current_user_top_tracks(limit=limit, time_range=term)
+
+            lines = []
+            for item in result['items']:
+                name = item['name']
+                artists = item['artists']
+                lines.append(f'{", ".join([a["name"] for a in artists])} - {name}')
+
+            lines = [f'{i + 1}. {l}' for i, l in enumerate(lines)]
+            return lines
+
+        def top_artists(limit, term):
+            result = client.current_user_top_artists(limit=limit, time_range=term)
+
+            lines = []
+            for item in result['items']:
+                name = item['name']
+                lines.append(name)
+
+            lines = [f'{i + 1}. {l}' for i, l in enumerate(lines)]
+            return lines
+
         terms = ['short_term', 'medium_term', 'long_term']
-        term = 'short_term'
+        term = terms[0]
         if len(args) >= 1:
             try:
                 idx = int(args[0])
                 term = terms[idx]
             except ValueError:
-                return {'embed': util.iferror(
+                return {'embed': iferror(
                     f'Invalid argument `{args[0]}`. Provide a number representing a time range:\n' +
                     ', '.join([f'{i}: {t}' for i, t in enumerate(terms)])
                 )}
             except IndexError:
-                return {'embed': util.iferror(
+                return {'embed': iferror(
                     f'Invalid choice of time range. Please choose a number 0-{len(terms)-1}.'
                 )}
 
-        result = client.current_user_top_tracks(limit=10, time_range=term)
+        lists = {
+            'track': (top_tracks, 'Your top % tracks'),
+            'artist': (top_artists, 'Your top % artists'),
+        }
+        chosen_list = 'track'
+        if len(args) >= 2:
+            if args[1] in lists.keys():
+                chosen_list = args[1]
+            else:
+                await message.channel.send(embed=ifwarn(f'Invalid list type: `{args[1]}`. Defaulting to top tracks'))
 
-        lines = []
-        for item in result['items']:
-            name = item['name']
-            artists = item['artists']
-            lines.append(f'{", ".join([a["name"] for a in artists])} - {name}')
+        limit = None
+        if len(args) >= 3:
+            try:
+                limit = int(args[2])
+            except ValueError:
+                await message.channel.send(embed=ifwarn(f'Invalid limit: `{args[2]}`. Defaulting to 10.'))
+        if limit is None:
+            limit = 10
 
-        lines = [f'{i+1}. {l}' for i, l in enumerate(lines)]
+        callback, verbiage = lists[chosen_list]
 
-        verbiage = {
+        lines = callback(limit, term)
+
+        term_verbiage = {
             'short_term': 'from the last month',
             'medium_term': 'from the last 6 months',
             'long_term': 'of all time'
         }[term]
 
+        title = verbiage.replace('%', str(limit)) + ' ' + term_verbiage
+
         embed = discord.Embed(
-            title=f'Your top tracks {verbiage}'.strip(),
-            description=util.shorten('\n'.join(lines), 2000),
+            title=title,
+            description=shorten('\n'.join(lines), 2000),
             color=SPOTIFY_COLOR
         )
         # await message.channel.send(embed=embed)
@@ -278,7 +482,7 @@ def load(core):
 
     async def genresof(message, args):
         if len(args) < 1:
-            return {'embed': util.ifwarn(
+            return {'embed': ifwarn(
                 lang()('supply.generic', 'an artist to search for')
             )}
 
@@ -288,7 +492,7 @@ def load(core):
         artists = results['artists']['items']
 
         if len(artists) < 1:
-            return {'embed': util.iferror(
+            return {'embed': iferror(
                 f'No results found for: **{artist}**'
             )}
 
@@ -307,7 +511,7 @@ def load(core):
         return {'embed': embed}
 
     async def authtest(message, args):
-        message.channel.send(embed=util.ifsuccess(''))
+        message.channel.send(embed=ifsuccess(''))
 
     register_command()('spotify', subcommand()({
         'playlist': argparse()({
@@ -338,8 +542,8 @@ def load(core):
             print('received spotify webhook message with invalid (non-int) state!')
             return
 
-        if state not in waiting_on_auth:
-            return
+        # if state not in waiting_on_auth:
+        #     return
 
         if ('code' not in payload) or (not payload['code']):
             print('received spotify webhook message with no code!')
@@ -347,10 +551,12 @@ def load(core):
 
         user_spotifies[state] = {
             'client': sus_spotify(payload['code']),
-            'expires': util.now_dt() + timedelta(minutes=59)  # ???
+            'expires': now_dt() + timedelta(minutes=59)  # ???
         }
-
-        waiting_on_auth.remove(state)
+        try:
+            waiting_on_auth.remove(state)
+        except:
+            pass
 
     if register_webhook():
         # this is ok because the first time this file gets loaded it's because it's a subscriber of commandv2, but it
