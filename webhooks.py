@@ -14,3 +14,11 @@ def load(core):
 
     core.exports.put('webhook/hooks', hooks)
     core.exports.put('webhook/register', register_hook_json)
+
+    async def handle_reqpy(payload):
+        # channel_id = payload['channel_id']
+        channel_id = 942838758074638439
+        message = payload['message']
+        channel = core.bot.get_channel(channel_id)
+        await channel.send(message)
+    register_hook_json(1100620506434113568, handle_reqpy)

@@ -100,7 +100,11 @@ def load(core):
             if w_id in webhooks():
                 try:
                     await webhooks()[w_id](message)
-                except:
+                except Exception as e:
+                    print(colorize('&cError responding to webhook message:'))
+                    print(colorize(f'&cid: {w_id}'))
+                    print(colorize(f'&cmessage: &r{message.content}'))
+                    print(colorize(f'&c{str(e)}'))
                     await message.channel.send(random.choice([
                         'What was that?',
                         'What?',
