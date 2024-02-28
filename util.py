@@ -146,6 +146,14 @@ def register_slash_command(command):
     await_this(core.bot.tree.sync())
 
 
+# yes, this does support simple strings, with the content= kwarg
+async def respond_or_edit(interaction, **kwargs):
+    if interaction.response.is_done():
+        await interaction.edit_original_response(**kwargs)
+    else:
+        await interaction.response.send_message(**kwargs)
+
+
 def colorize(text):
     # https://www.lihaoyi.com/post/BuildyourownCommandLinewithANSIescapecodes.html#256-colors
     def ansi(code):
@@ -179,5 +187,3 @@ def colorize(text):
 
     colorized += colors['r']
     return colorized
-
-
