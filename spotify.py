@@ -212,9 +212,12 @@ def load(core):
         else:
             num = 10
 
-        def stringify(d, values=True):
+        def stringify(d, values=True, normalize=False):
             if values:
-                line = lambda k, v: f'{k}: **{v/len(tracks):.2f}**'
+                if normalize:
+                    line = lambda k, v: f'{k}: **{v/len(tracks):.2f}**'
+                else:
+                    line = lambda k, v: f'{k}: **{v}**'
             else:
                 line = lambda k, v: f'{k}'
             return '\n'.join([line(k, v) for k, v in list(d.items())[:num]])
@@ -240,10 +243,10 @@ def load(core):
             value=len(genre_frequencies)
         ).add_field(
             name='Top artists',
-            value=shorten(stringify(artist_name_freq, False), 1024)
+            value=shorten(stringify(artist_name_freq), 1024)
         ).add_field(
             name='Genre analysis',
-            value=shorten(stringify(genre_frequencies), 1024)
+            value=shorten(stringify(genre_frequencies, values=True, normalize=True), 1024)
         ).add_field(
             name='Average song length',
             value= str(timedelta(seconds=avg_length_sec))

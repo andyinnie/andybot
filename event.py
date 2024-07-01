@@ -142,12 +142,13 @@ def load(core):
 
         channel = core.bot.get_guild(payload.guild_id).get_channel(payload.channel_id)
         if channel is None:
-            # eh
             return
 
         message = await channel.fetch_message(payload.message_id)
-        if message.author == core.bot.user:
-            await message.add_reaction(payload.emoji)
+
+        if hooks():
+            for hook_obj in hooks()['member_join']:
+                await hook_obj.func(message, payload.emoji)
 
     @core.bot.event
     async def on_member_join(member):

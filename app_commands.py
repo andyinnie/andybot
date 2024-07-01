@@ -2,7 +2,7 @@
 
 from discord import app_commands, Interaction
 
-from util import core
+from util import core, iferror, ifsuccess
 
 
 def load(_):
@@ -10,4 +10,8 @@ def load(_):
     async def ping(interaction: Interaction) -> None:
         await interaction.response.send_message("pong!")
 
-    core.bot.tree.add_command(ping)
+    for command in [ping]:
+        try:
+            core.bot.tree.add_command(command)
+        except app_commands.errors.CommandAlreadyRegistered:
+            pass

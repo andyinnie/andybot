@@ -56,7 +56,7 @@ async def get_or_create_channel_by_user(member):
 
 
 def is_wordle(text):
-    return bool(re.match(r'(?s)^Wordle \d+ [1-6X]/6\*?\n.*$', text))
+    return bool(re.match(r'(?s)^Wordle [\d,]+ [1-6X]/6\*?\n.*$', text))
 
 
 def analyze(text):
@@ -69,7 +69,7 @@ def analyze(text):
     except ValueError:
         score = -1
 
-    return WordleGrid(int(first_line_split[1]),
+    return WordleGrid(int(first_line_split[1].replace(',', '')),
                       score,
                       first_line_split[-1].endswith('*'),
                       score == -1)
