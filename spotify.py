@@ -39,10 +39,7 @@ def sus_spotify(code):
 
 
 def load(core):
-    register_command = core.exports.get('command/register')
     register_webhook = core.exports.get('webhook/register')
-    subcommand = core.exports.get('command/subcommand')
-    argparse = core.exports.get('command/argparse')
     lang = core.exports.get('lang')
 
     spotify = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials(), requests_timeout=10)
@@ -60,7 +57,7 @@ def load(core):
                     except spotipy.exceptions.SpotifyException as e:
                         if e.http_status == 403:
                             # invalid scope, send a new auth link with correct scope
-                            reason = 'The last time you authorized, it was for a different command. '\
+                            reason = 'The last time you authorized, it was for a different command. ' \
                                      'You\'ll need to reauthorize.'
                         else:
                             raise e
@@ -78,8 +75,8 @@ def load(core):
             waiting_on_auth.add(state)
             return {
                 "embed": ifinfo((f'{reason}\n' if reason else '') +
-                                     'I\'ve DMed you a link - click on it to authorize Spotify.\n'
-                                     'When you\'re done, repeat the command.')
+                                'I\'ve DMed you a link - click on it to authorize Spotify.\n'
+                                'When you\'re done, repeat the command.')
             }
         return _internal
 
@@ -116,27 +113,30 @@ def load(core):
                 return
         return _internal
 
-    async def playlist(message, args):
+    @app_commands.command()
+    async def spotifyplaylist(interaction: Interaction, url: str) -> None:
         try:
             playlist_metadata = spotify.playlist(
-                args['playlist_id'],
+                url,
                 fields='name,description,images(url),external_urls,tracks(total),followers(total)'
             )
         except spotipy.exceptions.SpotifyException as e:
             if e.http_status == 404:
-                return {'embed': iferror(
+                await respond_or_edit(interaction, embed=iferror(
                     lang()('error.invalid.generic', 'playlist ID or share link')
-                )}
+                ))
+                return
             else:
-                return {'embed': iferror(
+                await respond_or_edit(interaction, embed=iferror(
                     lang()('error.unknown') + f'\n{str(e)}'
-                )}
+                ))
+                return
 
         # get all tracks in a big list
         tracks = []
         offset = 0
         while True:
-            response = spotify.playlist_items(args['playlist_id'],
+            response = spotify.playlist_items(url,
                                               offset=offset,
                                               fields=f'items(is_local,track(artists(id,name),duration_ms))',
                                               additional_types=['track'])
@@ -156,9 +156,10 @@ def load(core):
             offset = offset + len(response['items'])
 
         if len(tracks) == 0:
-            return {'embed': iferror(
+            await respond_or_edit(interaction, embed=iferror(
                 'That playlist is empty, silly! (or something went horribly wrong behind the scenes here)'
-            )}
+            ))
+            return
 
         # compile all artists in a giant list, include repeats
         raw_artists = []
@@ -203,14 +204,7 @@ def load(core):
         genre_frequencies = frequency_dict(raw_genres)
         genre_frequencies = sort_dict(genre_frequencies)
 
-        if 'limit' in args:
-            if args['limit'] < 0:
-                return {'embed': iferror(
-                    'Number of results should be positive'
-                )}
-            num = args['limit']
-        else:
-            num = 10
+        num = 10
 
         def stringify(d, values=True, normalize=False):
             if values:
@@ -257,7 +251,7 @@ def load(core):
         )
 
         # await message.channel.send(embed=embed)
-        return {'embed': embed}
+        await respond_or_edit(interaction, embed=embed)
 
     @app_commands.command()
     @app_commands.choices(term=[
@@ -321,103 +315,17 @@ def load(core):
 
         await require_auth_new(interaction, _internal, 'user-top-read')
 
-    register_slash_command(spotifystats)
-
-    # async def me(message, args, client):
-    #     def top_tracks(limit, term):
-    #         result = client.current_user_top_tracks(limit=limit, time_range=term)
-    #
-    #         lines = []
-    #         for item in result['items']:
-    #             name = item['name']
-    #             artists = item['artists']
-    #             lines.append(f'{", ".join([a["name"] for a in artists])} - {name}')
-    #
-    #         lines = [f'{i + 1}. {l}' for i, l in enumerate(lines)]
-    #         return lines
-    #
-    #     def top_artists(limit, term):
-    #         result = client.current_user_top_artists(limit=limit, time_range=term)
-    #
-    #         lines = []
-    #         for item in result['items']:
-    #             name = item['name']
-    #             lines.append(name)
-    #
-    #         lines = [f'{i + 1}. {l}' for i, l in enumerate(lines)]
-    #         return lines
-    #
-    #     terms = ['short_term', 'medium_term', 'long_term']
-    #     term = terms[0]
-    #     if len(args) >= 1:
-    #         try:
-    #             idx = int(args[0])
-    #             term = terms[idx]
-    #         except ValueError:
-    #             return {'embed': iferror(
-    #                 f'Invalid argument `{args[0]}`. Provide a number representing a time range:\n' +
-    #                 ', '.join([f'{i}: {t}' for i, t in enumerate(terms)])
-    #             )}
-    #         except IndexError:
-    #             return {'embed': iferror(
-    #                 f'Invalid choice of time range. Please choose a number 0-{len(terms)-1}.'
-    #             )}
-    #
-    #     lists = {
-    #         'track': (top_tracks, 'Your top % tracks'),
-    #         'artist': (top_artists, 'Your top % artists'),
-    #     }
-    #     chosen_list = 'track'
-    #     if len(args) >= 2:
-    #         if args[1] in lists.keys():
-    #             chosen_list = args[1]
-    #         else:
-    #             await message.channel.send(embed=ifwarn(f'Invalid list type: `{args[1]}`. Defaulting to top tracks'))
-    #
-    #     limit = None
-    #     if len(args) >= 3:
-    #         try:
-    #             limit = int(args[2])
-    #         except ValueError:
-    #             await message.channel.send(embed=ifwarn(f'Invalid limit: `{args[2]}`. Defaulting to 10.'))
-    #     if limit is None:
-    #         limit = 10
-    #
-    #     callback, verbiage = lists[chosen_list]
-    #
-    #     lines = callback(limit, term)
-    #
-    #     term_verbiage = {
-    #         'short_term': 'from the last month',
-    #         'medium_term': 'from the last 6 months',
-    #         'long_term': 'of all time'
-    #     }[term]
-    #
-    #     title = verbiage.replace('%', str(limit)) + ' ' + term_verbiage
-    #
-    #     embed = discord.Embed(
-    #         title=title,
-    #         description=shorten('\n'.join(lines), 2000),
-    #         color=SPOTIFY_COLOR
-    #     )
-    #     # await message.channel.send(embed=embed)
-    #     return {'embed': embed}
-
-    async def genresof(message, args):
-        if len(args) < 1:
-            return {'embed': ifwarn(
-                lang()('supply.generic', 'an artist to search for')
-            )}
-
-        artist = ' '.join(args)
+    @app_commands.command()
+    async def spotifygenres(interaction: Interaction, artist: str) -> None:
         results = spotify.search(artist, limit=1, type='artist')
 
         artists = results['artists']['items']
 
         if len(artists) < 1:
-            return {'embed': iferror(
+            await respond_or_edit(interaction, embed=iferror(
                 f'No results found for: **{artist}**'
-            )}
+            ))
+            return
 
         proper_name = artists[0]['name']
         genres = artists[0]['genres']
@@ -425,35 +333,17 @@ def load(core):
         embed = discord.Embed(
             title=f'{proper_name}\'s genres',
             description='\n'.join(
-                [f' - {g}' for g in genres]
+                [f'- {g}' for g in genres]
             ),
             color=SPOTIFY_COLOR
         )
 
-        # await message.channel.send(embed=embed)
-        return {'embed': embed}
+        await respond_or_edit(interaction, embed=embed)
 
-    async def authtest(message, args):
-        message.channel.send(embed=ifsuccess(''))
-
-    register_command()('spotify', subcommand()({
-        'playlist': argparse()({
-            'playlist_id': ParsyArg(
-                str,
-                lang()('error.invalid.generic', 'playlist ID or share link'),
-                lang()('supply.generic', 'either a playlist ID or share link')
-            ),
-            'limit': ParsyArg(
-                int,
-                lang()('error.invalid.integer'),
-                optional=True
-            )
-        }, catch_timeout(playlist)),
-        # 'me': catch_timeout(require_auth(me, 'user-top-read')),
-        'genresof': catch_timeout(genresof),
-        'authtest': require_auth(authtest, '')
-    }))
-    print('Registered spotify command')
+    register_slash_command(spotifyplaylist)
+    register_slash_command(spotifystats)
+    register_slash_command(spotifygenres)
+    print('Registered spotify commands')
 
     async def handle_bot_talk(payload):
         try:
