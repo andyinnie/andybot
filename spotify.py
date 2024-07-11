@@ -10,9 +10,8 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials, SpotifyOAuth
 from spotipy.cache_handler import MemoryCacheHandler
 
-from util import ifinfo, now_dt, ifwarn, shorten, frequency_dict, ifsuccess, iferror, register_slash_command, \
+from util import ifinfo, now_dt, shorten, frequency_dict, iferror, register_slash_command, \
     respond_or_edit
-from commandv2 import ParsyArg
 
 REDIRECT_URI = 'https://andrewjm.me/spotify'
 SPOTIFY_COLOR = 0x1DB954
@@ -44,42 +43,6 @@ def load(core):
 
     spotify = spotipy.Spotify(client_credentials_manager=SpotifyClientCredentials(), requests_timeout=10)
 
-    # TODO: figure out how to make these into decorators
-    def require_auth(function, scope):
-        async def _internal(message, args):
-            reason = None
-            if (state := message.author.id) in user_spotifies:
-                if now_dt() < user_spotifies[message.author.id]['expires']:
-                    client = user_spotifies[message.author.id]['client']
-
-                    try:
-                        return await function(message, args, client)
-                    except spotipy.exceptions.SpotifyException as e:
-                        if e.http_status == 403:
-                            # invalid scope, send a new auth link with correct scope
-                            reason = 'The last time you authorized, it was for a different command. ' \
-                                     'You\'ll need to reauthorize.'
-                        else:
-                            raise e
-                else:
-                    reason = 'Authorization timed out.'
-
-                del user_spotifies[message.author.id]
-
-            await message.author.send(SpotifyOAuth.OAUTH_AUTHORIZE_URL +
-                                      f'?client_id={getenv("SPOTIPY_CLIENT_ID")}'
-                                      '&response_type=code'
-                                      f'&redirect_uri={REDIRECT_URI}'
-                                      f'&state={state}'
-                                      f'&scope={scope}')  # kek
-            waiting_on_auth.add(state)
-            return {
-                "embed": ifinfo((f'{reason}\n' if reason else '') +
-                                'I\'ve DMed you a link - click on it to authorize Spotify.\n'
-                                'When you\'re done, repeat the command.')
-            }
-        return _internal
-
     async def require_auth_new(interaction, callback, scope):
         user = interaction.user
         if user.id in user_spotifies:
@@ -99,19 +62,6 @@ def load(core):
         ))
 
         waiting_on_auth[user.id] = callback
-
-    def catch_timeout(function):
-        async def _internal(message, args):
-            try:
-                async with message.channel.typing():
-                    response = await function(message, args)
-                await message.channel.send(**response)
-            except ReadTimeout as e:
-                await message.channel.send(embed=iferror(
-                    'Request timed out, please try again.'
-                ))
-                return
-        return _internal
 
     @app_commands.command()
     async def spotifyplaylist(interaction: Interaction, url: str) -> None:
